@@ -1,0 +1,89 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {userId} (matches request.auth.uid)
+// Fields:
+//   - uid: string (required) - The unique ID of the user.
+//   - preferredPersonaId: string (required) - The ID of the user's preferred persona.
+//   - vibeMode: bool (required) - Whether the user has vibe mode enabled.
+//   - updatedAt: timestamp (optional) - The last time the profile was updated.
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "abhisheksikarwar1423@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUserProfile(data) {
+      return hasRequiredFields(['uid', 'preferredPersonaId', 'vibeMode']) &&
+             hasOnlyAllowedFields(['uid', 'preferredPersonaId', 'vibeMode', 'updatedAt', 'role']) &&
+             data.uid is string && data.uid == request.auth.uid &&
+             data.preferredPersonaId is string && data.preferredPersonaId.size() < 50 &&
+             data.vibeMode is bool &&
+             (!('updatedAt' in data) || data.updatedAt is timestamp) &&
+             (!('role' in data) || data.role in ['user', 'admin']);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Users can only read their own profile, unless they are an admin
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Users can create their own profile, but cannot set their own role to admin
+      allow create: if isOwner(userId) && isValidUserProfile(request.resource.data) && 
+                    (!('role' in request.resource.data) || request.resource.data.role == 'user' || isAdmin());
+      
+      // Users can update their own profile, but cannot change their role unless they are an admin
+      allow update: if isOwner(userId) && isValidUserProfile(request.resource.data) && 
+                    (request.resource.data.role == resource.data.role || isAdmin());
+      
+      // Only admins can delete profiles
+      allow delete: if isAdmin();
+
+      // Memories subcollection
+      match /memories/{memoryId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

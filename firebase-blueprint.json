@@ -1,0 +1,37 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user preferences and settings.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique ID of the user." },
+        "preferredPersonaId": { "type": "string", "description": "The ID of the user's preferred persona." },
+        "vibeMode": { "type": "boolean", "description": "Whether the user has vibe mode enabled." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "The last time the profile was updated." }
+      },
+      "required": ["uid", "preferredPersonaId", "vibeMode"]
+    },
+    "Memory": {
+      "title": "Memory",
+      "description": "A single piece of information remembered about the user.",
+      "type": "object",
+      "properties": {
+        "content": { "type": "string", "description": "The information to remember." },
+        "category": { "type": "string", "description": "Optional category for the memory (e.g., 'preference', 'fact', 'history')." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the memory was created." }
+      },
+      "required": ["content"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document."
+    },
+    "/users/{userId}/memories/{memoryId}": {
+      "schema": "Memory",
+      "description": "Individual memory items for the user."
+    }
+  }
+}
